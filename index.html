@@ -540,6 +540,13 @@ body { font-size: 14.5px; }
 @media (min-width: 900px) { .modal-card { border-radius: 6px; } }
 @media (max-width: 899.98px) { .sheet { border-radius: 8px 8px 0 0; } }
 
+.colt-fold { margin-top: 8px; border-top: 1px solid var(--line); }
+.colt-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; min-height: 36px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.colt-fold > summary::-webkit-details-marker { display: none; }
+.colt-fold > summary .chev { width: 16px; height: 16px; flex: none; transition: transform .16s ease; transform: rotate(-90deg); }
+.colt-fold[open] > summary .chev { transform: none; }
+.colt-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* ---------------------------------------------------------------- compare: cross-fade between the two scenarios */
 .cmpbar { position: absolute; right: 12px; bottom: 12px; width: min(420px, calc(100% - 24px)); z-index: 3; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px;
   padding: 10px 12px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
@@ -707,7 +714,7 @@ const CONC_NOTE = GEO.usoSrc || '';
 const ZONA_ALT = ['pianura', 'collina', 'montagna'];
 /* crops (ISTAT 2020 census, by comune where the land is): 0-11 arable crops, 12 fallow, 13-17 permanent crops, 18 kitchen gardens, 19 permanent meadows and pastures, 20 poor pastures, 21 out of production */
 const HAS_COLT = !!GEO.colt;
-const APP_V = '3', APP_DATE = '12 novembre 2026', APP_VER = `versione ${APP_V} · ${APP_DATE}`;
+const APP_V = '3.1', APP_DATE = '17 novembre 2026', APP_VER = `versione ${APP_V} · ${APP_DATE}`;
 // the version sits where the logo was: everybody sees at a glance which one they have open
 $$('[data-ver]').forEach(el => { el.textContent = el.dataset.ver === 'long' ? `Versione ${APP_V}` : `V${APP_V}`; el.title = `Mappa zone ATC, ${APP_VER}`; });
 const COLT_KEYS = GEO.coltKeys || [];
@@ -2335,7 +2342,8 @@ function coltAdd(acc, c) {
   });
   return true;
 }
-let coltAll = false;
+let coltAll = false, coltOpen = false;   // crops in the comune card: folded until asked, then as left for the session
+document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('colt-fold')) coltOpen = ev.target.open; }, true);
 const pct = f => (f > 0 && f < 0.005 ? '<1%' : Math.round(f * 100) + '%');
 document.addEventListener('click', ev => {
   const b = ev.target.closest('.colt-all'); if (!b) return;
@@ -2388,7 +2396,7 @@ function atcColtHtml(e) {
   return coltBlock(acc, e.hc, `Somma di ${plural(n, 'comune', 'comuni')}${e.n > n ? ` su ${fmtInt(e.n)} (gli altri senza dati ISTAT sulle colture)` : ''}${ns ? `, di cui ${ns} condivis${ns === 1 ? 'o' : 'i'} con un altro ATC e contat${ns === 1 ? 'o' : 'i'} per intero` : ''} · Censimento agricoltura 2020, ettari arrotondati`, {t: 'ent', id: e.id});
 }
 function usoHtml(c) {
-  if (HAS_COLT && c.colt) return coltHtml(c);
+  if (HAS_COLT && c.colt) { const h = coltHtml(c); return h ? `<details class="colt-fold"${coltOpen ? ' open' : ''}><summary>${CHEV}<span>Colture</span></summary>${h}</details>` : ''; }
   const u = c.uso; if (!u || !c.sau) return '';
   const [, sem, leg, pp, magri, fuori, riposo, z] = u;
   const ok = [`seminativi ${fmtInt(sem)}`]; if (leg) ok.push(`legnose ${fmtInt(leg)}`); if (pp && z !== 2) ok.push(`prati e pascoli ${fmtInt(pp)}`);
@@ -2401,7 +2409,7 @@ function renderInfo() {
   const sc = active();
   const c = COM[i], p = PROVS[c.prov], cur = effAssign(c.code), e = cur ? entryById(cur) : null, cur2 = effShared(c.code), e2 = cur2 ? entryById(cur2) : null;
   const a = e ? areaById(e.area) : null;
-  let h = `<div class="info-head"><div><h2>${esc(c.name)}</h2><p class="meta">${esc(p.name)} (${esc(p.acr)}) · ${esc(REGS[p.reg].name)} · <span class="num">${fmtKm(c.area)}</span> km² · ISTAT ${esc(c.code)}</p>${HAS_SAU ? `<p class="sau-line"><b class="num">${c.sau == null ? 'SAU n.d.' : 'SAU ' + fmtHa(c.sau)}</b>${c.conc != null ? `<b class="num conc">concimabile ${fmtHa(c.conc)}</b>` : ''}<span>Censimento agricoltura ISTAT 2020</span></p>${usoHtml(c)}` : ''}</div>
+  let h = `<div class="info-head"><div><h2>${esc(c.name)}</h2><p class="meta">${esc(p.name)} (${esc(p.acr)}) · ${esc(REGS[p.reg].name)} · <span class="num">${fmtKm(c.area)}</span> km² · ISTAT ${esc(c.code)}</p>${HAS_SAU ? `<p class="sau-line"><b class="num">${c.sau == null ? 'SAU n.d.' : 'SAU ' + fmtHa(c.sau)}</b>${c.conc != null ? `<b class="num conc">concimabile ${fmtHa(c.conc)}</b>` : ''}<b class="num conc">superficie ${fmtInt(c.area * 100)} ha</b><span>Censimento agricoltura ISTAT 2020</span></p>${usoHtml(c)}` : ''}</div>
     <button class="close-btn" type="button" id="info-close" aria-label="Chiudi">${IC.close}</button></div>`;
   h += `<div class="cur">${e ? `${entChip(e)}${e2 ? `<span class="plus">+</span>${entChip(e2)}` : ''}${a ? `<small>${e2 ? 'Condiviso · ' : ''}${esc(areaLbl(a.name))}${a.capo ? ' · capo area ' + esc(a.capo) : ''}</small>` : ''}` : '<span class="hint">Non assegnato</span>'}</div>`;
   const cf = sc && sc.conflicts[c.code];
